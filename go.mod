@@ -16,6 +16,7 @@ require (
 	github.com/nightlyone/lockfile v0.0.0-20200124072040-edb130adc195
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
+	github.com/pierrec/lz4/v4 v4.1.8
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.1.0
 	github.com/spf13/cobra v0.0.5

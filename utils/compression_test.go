@@ -69,5 +69,18 @@ var _ = Describe("utils/compression tests", func() {
 			resultProgram := utils.GetPipeThroughProgram()
 			structmatcher.ExpectStructsToMatch(&expectedProgram, &resultProgram)
 		})
+		It("initializes to use lz4 when passed compression type lz4 and a level", func() {
+			originalProgram := utils.GetPipeThroughProgram()
+			defer utils.SetPipeThroughProgram(originalProgram)
+			expectedProgram := utils.PipeThroughProgram{
+				Name:          "lz4",
+				OutputCommand: "lz4 --compress -7 -c",
+				InputCommand:  "lz4 --decompress -c",
+				Extension:     ".lz4",
+			}
+			utils.InitializePipeThroughParameters(true, "lz4", 7)
+			resultProgram := utils.GetPipeThroughProgram()
+			structmatcher.ExpectStructsToMatch(&expectedProgram, &resultProgram)
+		})
 	})
 })

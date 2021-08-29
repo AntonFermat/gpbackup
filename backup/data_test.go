@@ -119,6 +119,29 @@ var _ = Describe("backup/data tests", func() {
 
 			Expect(err).ShouldNot(HaveOccurred())
 		})
+		It("will back up a table to its own file with lz4 compression", func() {
+			utils.SetPipeThroughProgram(utils.PipeThroughProgram{Name: "lz4", OutputCommand: "lz4 --compress -5 -c", InputCommand: "lz4 --decompress -c", Extension: ".lz4"})
+			execStr := regexp.QuoteMeta("COPY public.foo TO PROGRAM 'lz4 --compress -3 -c > <SEG_DATA_DIR>/backups/20170101/20170101010101/gpbackup_<SEGID>_20170101010101_3456.zst' WITH CSV DELIMITER ',' ON SEGMENT IGNORE EXTERNAL PARTITIONS;")
+			mock.ExpectExec(execStr).WillReturnResult(sqlmock.NewResult(10, 0))
+			filename := "<SEG_DATA_DIR>/backups/20170101/20170101010101/gpbackup_<SEGID>_20170101010101_3456.zst"
+
+			_, err := backup.CopyTableOut(connectionPool, testTable, filename, defaultConnNum)
+
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+		It("will back up a table to its own file with lz4 compression using a plugin", func() {
+			_ = cmdFlags.Set(options.PLUGIN_CONFIG, "/tmp/plugin_config")
+			pluginConfig := utils.PluginConfig{ExecutablePath: "/tmp/fake-plugin.sh", ConfigPath: "/tmp/plugin_config"}
+			backup.SetPluginConfig(&pluginConfig)
+			utils.SetPipeThroughProgram(utils.PipeThroughProgram{Name: "lz4", OutputCommand: "lz4 --compress -3 -c", InputCommand: "lz4 --decompress -c", Extension: ".lz4"})
+			execStr := regexp.QuoteMeta("COPY public.foo TO PROGRAM 'lz4 --compress -3 -c | /tmp/fake-plugin.sh backup_data /tmp/plugin_config <SEG_DATA_DIR>/backups/20170101/20170101010101/gpbackup_<SEGID>_20170101010101_3456' WITH CSV DELIMITER ',' ON SEGMENT IGNORE EXTERNAL PARTITIONS;")
+			mock.ExpectExec(execStr).WillReturnResult(sqlmock.NewResult(10, 0))
+
+			filename := "<SEG_DATA_DIR>/backups/20170101/20170101010101/gpbackup_<SEGID>_20170101010101_3456"
+			_, err := backup.CopyTableOut(connectionPool, testTable, filename, defaultConnNum)
+
+			Expect(err).ShouldNot(HaveOccurred())
+		})
 		It("will back up a table to its own file without compression", func() {
 			utils.SetPipeThroughProgram(utils.PipeThroughProgram{Name: "cat", OutputCommand: "cat -", InputCommand: "cat -", Extension: ""})
 			execStr := regexp.QuoteMeta("COPY public.foo TO PROGRAM 'cat - > <SEG_DATA_DIR>/backups/20170101/20170101010101/gpbackup_<SEGID>_20170101010101_3456' WITH CSV DELIMITER ',' ON SEGMENT IGNORE EXTERNAL PARTITIONS;")

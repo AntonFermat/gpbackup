@@ -119,6 +119,7 @@ func ValidateCompressionTypeAndLevel(compressionType string, compressionLevel in
 	compressionLevelsForType := map[string]CompressionLevelsDescription{
 		"gzip": {Min: 1, Max: 9},
 		"zstd": {Min: 1, Max: 19},
+		"lz4":  {Min: 1, Max: 12},
 	}
 
 	if levelsDescription, ok := compressionLevelsForType[compressionType]; ok {

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"fmt"
+	"github.com/pierrec/lz4/v4"
 	"io"
 	"io/ioutil"
 	"os"
@@ -223,7 +224,7 @@ func getRestoreDataReader(toc *toc.SegmentTOC, oidList []int) (*RestoreReader, e
 			restoreReader.readerType = NONSEEKABLE
 		}
 	} else {
-		if *isFiltered && !strings.HasSuffix(*dataFile, ".gz") && !strings.HasSuffix(*dataFile, ".zst") {
+		if *isFiltered && !strings.HasSuffix(*dataFile, ".gz") && !strings.HasSuffix(*dataFile, ".zst") && !strings.HasSuffix(*dataFile, ".lz4") {
 			// Seekable reader if backup is not compressed and filters are set
 			seekHandle, err = os.Open(*dataFile)
 			restoreReader.readerType = SEEKABLE
@@ -252,6 +253,12 @@ func getRestoreDataReader(toc *toc.SegmentTOC, oidList []int) (*RestoreReader, e
 			return nil, err
 		}
 		restoreReader.bufReader = bufio.NewReader(zstdReader)
+	} else if strings.HasSuffix(*dataFile, ".lz4") {
+		lz4Reader := lz4.NewReader(readHandle)
+		if err != nil {
+			return nil, err
+		}
+		restoreReader.bufReader = bufio.NewReader(lz4Reader)
 	} else {
 		restoreReader.bufReader = bufio.NewReader(readHandle)
 	}
@@ -289,7 +296,9 @@ func startRestorePluginCommand(toc *toc.SegmentTOC, oidList []int) (io.Reader, b
 		return nil, false, err
 	}
 	cmdStr := ""
-	if pluginConfig.CanRestoreSubset() && *isFiltered && !strings.HasSuffix(*dataFile, ".gz") && !strings.HasSuffix(*dataFile, ".zst") {
+	if pluginConfig.CanRestoreSubset() && *isFiltered && !strings.HasSuffix(*dataFile, ".gz") &&
+		!strings.HasSuffix(*dataFile, ".zst") &&
+		!strings.HasSuffix(*dataFile, ".lz4") {
 		offsetsFile, _ := ioutil.TempFile("/tmp", "gprestore_offsets_")
 		defer func() {
 			offsetsFile.Close()

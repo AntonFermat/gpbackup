@@ -33,6 +33,11 @@ func InitializePipeThroughParameters(compress bool, compressionType string, comp
 		pipeThroughProgram = PipeThroughProgram{Name: "zstd", OutputCommand: fmt.Sprintf("zstd --compress -%d -c", compressionLevel), InputCommand: "zstd --decompress -c", Extension: ".zst"}
 		return
 	}
+
+	if compressionType == "lz4" {
+		pipeThroughProgram = PipeThroughProgram{Name: "lz4", OutputCommand: fmt.Sprintf("lz4 --compress -%d -c", compressionLevel), InputCommand: "lz4 --decompress -c", Extension: ".lz4"}
+		return
+	}
 }
 
 func GetPipeThroughProgram() PipeThroughProgram {

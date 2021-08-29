@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/pierrec/lz4/v4"
 	"io/ioutil"
 	"math"
 	"os"
@@ -124,6 +125,14 @@ var _ = Describe("gpbackup_helper end to end integration tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			assertBackupArtifactsWithCompression("zstd", false)
 		})
+		It("runs backup gpbackup_helper with lz4 compression", func() {
+			helperCmd := gpbackupHelper(gpbackupHelperPath, "--backup-agent", "--compression-type", "lz4", "--compression-level", "1", "--data-file", dataFileFullPath+".lz4")
+			writeToPipes(defaultData)
+			err := helperCmd.Wait()
+			printHelperLogOnError(err)
+			Expect(err).ToNot(HaveOccurred())
+			assertBackupArtifactsWithCompression("lz4", false)
+		})
 		It("runs backup gpbackup_helper without compression with plugin", func() {
 			helperCmd := gpbackupHelper(gpbackupHelperPath, "--backup-agent", "--compression-level", "0", "--data-file", dataFileFullPath, "--plugin-config", pluginConfigPath)
 			writeToPipes(defaultData)
@@ -147,6 +156,14 @@ var _ = Describe("gpbackup_helper end to end integration tests", func() {
 			printHelperLogOnError(err)
 			Expect(err).ToNot(HaveOccurred())
 			assertBackupArtifactsWithCompression("zstd", true)
+		})
+		It("runs backup gpbackup_helper with lz4 compression with plugin", func() {
+			helperCmd := gpbackupHelper(gpbackupHelperPath, "--backup-agent", "--compression-type", "lz4", "--compression-level", "1", "--data-file", dataFileFullPath+".lz4", "--plugin-config", pluginConfigPath)
+			writeToPipes(defaultData)
+			err := helperCmd.Wait()
+			printHelperLogOnError(err)
+			Expect(err).ToNot(HaveOccurred())
+			assertBackupArtifactsWithCompression("lz4", true)
 		})
 		It("Generates error file when backup agent interrupted", func() {
 			helperCmd := gpbackupHelper(gpbackupHelperPath, "--backup-agent", "--compression-level", "0", "--data-file", dataFileFullPath)
@@ -195,6 +212,18 @@ var _ = Describe("gpbackup_helper end to end integration tests", func() {
 			Expect(err).ToNot(HaveOccurred())
 			assertNoErrors()
 		})
+		It("runs restore gpbackup_helper with lz4 compression", func() {
+			setupRestoreFiles("lz4", false)
+			helperCmd := gpbackupHelper(gpbackupHelperPath, "--restore-agent", "--data-file", dataFileFullPath+".lz4")
+			for _, i := range []int{1, 3} {
+				contents, _ := ioutil.ReadFile(fmt.Sprintf("%s_%d", pipeFile, i))
+				Expect(string(contents)).To(Equal("here is some data\n"))
+			}
+			err := helperCmd.Wait()
+			printHelperLogOnError(err)
+			Expect(err).ToNot(HaveOccurred())
+			assertNoErrors()
+		})
 		It("runs restore gpbackup_helper without compression with plugin", func() {
 			setupRestoreFiles("", true)
 			helperCmd := gpbackupHelper(gpbackupHelperPath, "--restore-agent", "--data-file", dataFileFullPath, "--plugin-config", pluginConfigPath)
@@ -222,6 +251,18 @@ var _ = Describe("gpbackup_helper end to end integration tests", func() {
 		It("runs restore gpbackup_helper with zstd compression with plugin", func() {
 			setupRestoreFiles("zstd", true)
 			helperCmd := gpbackupHelper(gpbackupHelperPath, "--restore-agent", "--data-file", dataFileFullPath+".zst", "--plugin-config", pluginConfigPath)
+			for _, i := range []int{1, 3} {
+				contents, _ := ioutil.ReadFile(fmt.Sprintf("%s_%d", pipeFile, i))
+				Expect(string(contents)).To(Equal("here is some data\n"))
+			}
+			err := helperCmd.Wait()
+			printHelperLogOnError(err)
+			Expect(err).ToNot(HaveOccurred())
+			assertNoErrors()
+		})
+		It("runs restore gpbackup_helper with lz4 compression with plugin", func() {
+			setupRestoreFiles("lz4", true)
+			helperCmd := gpbackupHelper(gpbackupHelperPath, "--restore-agent", "--data-file", dataFileFullPath+".lz4", "--plugin-config", pluginConfigPath)
 			for _, i := range []int{1, 3} {
 				contents, _ := ioutil.ReadFile(fmt.Sprintf("%s_%d", pipeFile, i))
 				Expect(string(contents)).To(Equal("here is some data\n"))
@@ -332,6 +373,12 @@ func setupRestoreFiles(compressionType string, withPlugin bool) {
 		zstdf, _ := zstd.NewWriter(f)
 		defer zstdf.Close()
 		_, _ = zstdf.Write([]byte(expectedData))
+	} else if compressionType == "lz4" {
+		f, _ := os.Create(dataFile + ".lz4")
+		defer f.Close()
+		lz4f := lz4.NewWriter(f)
+		defer lz4f.Close()
+		_, _ = lz4f.Write([]byte(expectedData))
 	} else {
 		f, _ := os.Create(dataFile)
 		_, _ = f.WriteString(expectedData)
@@ -385,6 +432,8 @@ func assertBackupArtifactsWithCompression(compressionType string, withPlugin boo
 		contents, err = ioutil.ReadFile(dataFile + ".gz")
 	} else if compressionType == "zstd" {
 		contents, err = ioutil.ReadFile(dataFile + ".zst")
+	} else if compressionType == "lz4" {
+		contents, err = ioutil.ReadFile(dataFile + ".lz4")
 	} else {
 		Fail("unknown compression type " + compressionType)
 	}
@@ -395,6 +444,9 @@ func assertBackupArtifactsWithCompression(compressionType string, withPlugin boo
 		contents, _ = ioutil.ReadAll(r)
 	} else if compressionType == "zstd" {
 		r, _ := zstd.NewReader(bytes.NewReader(contents))
+		contents, _ = ioutil.ReadAll(r)
+	} else if compressionType == "lz4" {
+		r := lz4.NewReader(bytes.NewReader(contents))
 		contents, _ = ioutil.ReadAll(r)
 	} else {
 		Fail("unknown compression type " + compressionType)
